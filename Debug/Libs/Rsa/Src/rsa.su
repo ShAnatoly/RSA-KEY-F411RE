@@ -1,0 +1,6 @@
+../Libs/Rsa/Src/rsa.c:15:6:import_pub_key	4200	dynamic,bounded
+../Libs/Rsa/Src/rsa.c:64:6:import_pvt_key	18648	dynamic,bounded
+../Libs/Rsa/Src/rsa.c:125:6:encrypt	272	static
+../Libs/Rsa/Src/rsa.c:144:6:encrypt_buf	536	static
+../Libs/Rsa/Src/rsa.c:162:6:decrypt	1056	static
+../Libs/Rsa/Src/rsa.c:196:6:decrypt_buf	296	static
