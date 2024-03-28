@@ -1,12 +1,6 @@
 #include "asn1.h"
+#include <stdint.h>
 
-/**
- * \brief Получение числа из структуры asn1
- * @param buffer Буффер данных asn1
- * @param int_ptr Указатель на записанное число
- * @param nbytes Размер данных
- * @return
- */
 int asn1_get_int(const uint8_t *buffer, const uint8_t **int_ptr, size_t *nbytes) {
     if (buffer[0] != ASN1_INTEGER) {
         return -1;
@@ -26,11 +20,6 @@ int asn1_get_int(const uint8_t *buffer, const uint8_t **int_ptr, size_t *nbytes)
     return *nbytes + int_index;
 }
 
-/**
- * \brief Получение отсупа для публичного ключа (нам не нужны некоторые данные и мы их пропускаем)
- * @param buffer Буффер данных asn1
- * @return Отступ
- */
 size_t asn1_get_padding_pub_key(const uint8_t *buffer) {
     size_t i = 0;
     if (buffer[i] != ASN1_SEQUENCE) {
@@ -73,11 +62,6 @@ size_t asn1_get_padding_pub_key(const uint8_t *buffer) {
     return i;
 }
 
-/**
- * \brief Получение отступа для приватного ключа (нам не нужны некоторые данные и мы их пропускаем)
- * @param buffer Буффер данных asn1
- * @return Отступ
- */
 size_t asn1_get_padding_pvt_key(const uint8_t *buffer) {
     size_t i = 0;
     if (buffer[i] != ASN1_SEQUENCE) {
@@ -127,11 +111,6 @@ size_t asn1_get_padding_pvt_key(const uint8_t *buffer) {
     return i;
 }
 
-/**
- * \brief Получение размера данных в структуре asn1, начиная с buffer
- * @param buffer Буффер данных asn1
- * @return Размер данных
- */
 size_t asn1_get_len(const uint8_t *buffer) {
     size_t len = buffer[0];
     if (buffer[0] & ~0x7F) {

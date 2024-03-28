@@ -1,5 +1,7 @@
 #include "rsa.h"
 
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "asn1.h"
@@ -7,14 +9,9 @@
 #include "bignum.h"
 #include "montgomery.h"
 
-/**
- * \brief Парсинг публичного ключа
- * @param key Указатель на публичный ключ
- * @param data Данные публичного ключа
- */
 void import_pub_key(rsa_pub_key_t *key, const char *data) {
-    const char begin[] = "-----BEGIN PUBLIC KEY-----\r\n";
-    const char end[] = "-----END PUBLIC KEY-----\r\n";
+    const char begin[] = "-----BEGIN PUBLIC KEY-----";
+    const char end[] = "-----END PUBLIC KEY-----";
     size_t in_size = 2048;
     char pem[in_size];
     strcpy(pem, data);
@@ -56,14 +53,9 @@ void import_pub_key(rsa_pub_key_t *key, const char *data) {
     }
 }
 
-/**
- * \brief Парсинг приватного ключа
- * @param key Указатель на приватный ключ
- * @param data Данные приватного ключа
- */
 void import_pvt_key(rsa_pvt_key_t *key, const char *data) {
-    const char begin[] = "-----BEGIN PRIVATE KEY-----\r\n";
-    const char end[] = "-----END PRIVATE KEY-----\r\n";
+    const char begin[] = "-----BEGIN PRIVATE KEY-----";
+    const char end[] = "-----END PRIVATE KEY-----";
     size_t in_size = 9192;
     char pem[in_size];
     strcpy(pem, data);
@@ -115,89 +107,55 @@ void import_pvt_key(rsa_pvt_key_t *key, const char *data) {
     }
 }
 
-/**
- * \brief Шифрование данных в формате больших чисел
- * @param key Публичный ключ
- * @param montg_domain_n Число n в пространстве montgomery
- * @param bignum_in Входные данные
- * @param bignum_out Зашифрованные данные
- */
-void encrypt(const rsa_pub_key_t *key, const montg_t *montg_domain_n, const bignum_t *bignum_in, bignum_t *bignum_out) {
+static void encrypt(const rsa_pub_key_t *key, const montg_t *montg_domain, const bignum_t *bignum_in, bignum_t *bignum_out) {
     bignum_t bignum_montg_in, bignum_montg_out;
 
-    montg_transform(montg_domain_n, bignum_in, &bignum_montg_in);
+    montg_transform(montg_domain, bignum_in, &bignum_montg_in);
     bn_init(&bignum_montg_out, BN_ARRAY_SIZE);
 
-    montg_pow(montg_domain_n, &bignum_montg_in, &key->pub_exp, &bignum_montg_out);
-    montg_revert(montg_domain_n, &bignum_montg_out, bignum_out);
+    montg_pow(montg_domain, &bignum_montg_in, &key->pub_exp, &bignum_montg_out);
+    montg_revert(montg_domain, &bignum_montg_out, bignum_out);
 }
 
-/**
- * \brief Шифрование данных в формате буффера
- * @param key Публичный ключ
- * @param montg_domain_n Число n в пространстве montgomery
- * @param buffer_in Входные данные
- * @param buffer_in_len Размер входных данных
- * @param buffer_out Зашифрованные данные
- * @param buffer_out_len Размер зашифрованных данных
- */
-void encrypt_buf(const rsa_pub_key_t *key, const montg_t *montg_domain_n, const char *buffer_in, size_t buffer_in_len, char *buffer_out, size_t buffer_out_len) {
+void encrypt_buf(const rsa_pub_key_t *key, const montg_t *montg_domain, const char *buffer_in, size_t bignum_in_len, char *buffer_out, size_t bignum_out_len) {
     bignum_t in_bn, out_bn;
     bn_init(&in_bn, BN_ARRAY_SIZE);
 
+    memmove(in_bn, buffer_in, bignum_in_len * sizeof(char));
+    encrypt(key, montg_domain, &in_bn, &out_bn);
+    bn_to_string(&out_bn, buffer_out, bignum_out_len);
+}
+
+static void decrypt(const rsa_pvt_key_t *key, const montg_t *montg_domain, const bignum_t *bignum_in, bignum_t *bignum_out) {
+    bignum_t bignum_montg_in, bignum_montg_out;
+
+    montg_transform(montg_domain, bignum_in, &bignum_montg_in);
+    bn_init(&bignum_montg_out, BN_ARRAY_SIZE);
+    montg_pow(montg_domain, &bignum_montg_in, &key->pvt_exp, &bignum_montg_out);
+    montg_revert(montg_domain, &bignum_montg_out, bignum_out);
+}
+
+void decrypt_buf(const rsa_pvt_key_t *key, const montg_t *montg_domain, const char *buffer_in, size_t buffer_in_len, char *buffer_out, size_t buffer_out_len) {
+    bignum_t in_bn, out_bn;
+    bn_init(&in_bn, BN_ARRAY_SIZE);
+
+    bn_from_string(&in_bn, buffer_in, buffer_in_len);
+    decrypt(key, montg_domain, &in_bn, &out_bn);
+    memmove(buffer_out, out_bn, buffer_out_len * sizeof(uint8_t));
+}
+
+void sign_buf(const rsa_pvt_key_t *key, const montg_t *montg_domain, const char *buffer_in, size_t buffer_in_len, char *buffer_out, size_t buffer_out_len) {
+    bignum_t in_bn = {0}, out_bn;
+
     memmove(in_bn, buffer_in, buffer_in_len * sizeof(char));
-    encrypt(key, montg_domain_n, &in_bn, &out_bn);
+    decrypt(key, montg_domain, &in_bn, &out_bn);
     bn_to_string(&out_bn, buffer_out, buffer_out_len);
 }
 
-/**
- * \brief Дешифрование данных в формате больших чисел
- * @param key Приватный ключ
- * @param montg_domain_n Число n в пространстве montgomery
- * @param montg_domain_p Число p в пространстве montgomery
- * @param montg_domain_q Число q в пространстве montgomery
- * @param bignum_in Зашифрованные данные
- * @param bignum_out Дешифрованные данные
- */
-void decrypt(const rsa_pvt_key_t *key, const montg_t *montg_domain_n, const montg_t *montg_domain_p, const montg_t *montg_domain_q, const bignum_t *bignum_in, bignum_t *bignum_out) {
-    bignum_t bignum_montg_p_in, bignum_montg_q_in, bignum_montg_p_out, bignum_montg_q_out, bignum_p_out, bignum_q_out, h, hq;
+void verify_buf(const rsa_pub_key_t *key, const montg_t *montg_domain, const char *buffer_in, size_t bignum_in_len, char *buffer_out, size_t bignum_out_len) {
+    bignum_t in_bn = {0}, out_bn;
 
-    montg_transform(montg_domain_p, bignum_in, &bignum_montg_p_in);
-    bn_init(&bignum_montg_p_out, BN_ARRAY_SIZE);
-    montg_pow(montg_domain_p, &bignum_montg_p_in, &key->exp1, &bignum_montg_p_out);
-    montg_revert(montg_domain_p, &bignum_montg_p_out, &bignum_p_out);
-
-    montg_transform(montg_domain_q, bignum_in, &bignum_montg_q_in);
-    bn_init(&bignum_montg_q_out, BN_ARRAY_SIZE);
-    montg_pow(montg_domain_q, &bignum_montg_q_in, &key->exp2, &bignum_montg_q_out);
-    montg_revert(montg_domain_q, &bignum_montg_q_out, &bignum_q_out);
-
-    bn_sub(&bignum_p_out, &bignum_q_out, &bignum_p_out, BN_ARRAY_SIZE);
-    montg_mul(montg_domain_p, &key->coeff, &bignum_p_out, &h);
-    montg_mul(montg_domain_n, &h, &key->q, &hq);
-    bn_add(&bignum_q_out, &hq, bignum_out, BN_ARRAY_SIZE);
-
-    while (bn_cmp(bignum_out, &key->mod, BN_ARRAY_SIZE) != BN_CMP_SMALLER) {
-        bn_sub(bignum_out, &key->mod, bignum_out, BN_ARRAY_SIZE);
-    }
-}
-
-/**
- * \brief Дешифрование данных в формате буффера
- * @param key Приватный ключ
- * @param montg_domain_n Число n в пространстве montgomery
- * @param montg_domain_p Число p в пространстве montgomery
- * @param montg_domain_q Число q в пространстве montgomery
- * @param bignum_in Зашифрованные данные
- * @param buffer_in_len Размер зашифрованных данных
- * @param bignum_out Дешифрованные данные
- * @param buffer_out_len Размер дешифрованных данных
- */
-void decrypt_buf(const rsa_pvt_key_t *key, const montg_t *montg_domain_n, const montg_t *montg_domain_p, const montg_t *montg_domain_q, const char *buffer_in, size_t buffer_in_len, char *buffer_out, size_t buffer_out_len) {
-    bignum_t in_bn, out_bn;
-    bn_init(&in_bn, BN_ARRAY_SIZE);
-
-    bn_from_string(&in_bn, buffer_in, buffer_in_len - 1);
-    decrypt(key, montg_domain_n, montg_domain_p, montg_domain_q, &in_bn, &out_bn);
-    memmove(buffer_out, out_bn, buffer_out_len * sizeof(uint8_t));
+    bn_from_string(&in_bn, buffer_in, bignum_in_len);
+    encrypt(key, montg_domain, &in_bn, &out_bn);
+    memmove(buffer_out, out_bn, bignum_out_len * sizeof(uint8_t));
 }

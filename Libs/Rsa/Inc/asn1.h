@@ -4,9 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/**
- * \brief Теги, которые могут встретиться в структуре asn1
- */
 typedef enum {
     ASN1_INTEGER = 0x02,
     ASN1_BIT_STRING = 0x03,

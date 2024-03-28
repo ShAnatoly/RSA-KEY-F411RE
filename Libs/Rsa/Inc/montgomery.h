@@ -3,9 +3,6 @@
 
 #include "bignum.h"
 
-/**
- * \brief Число в пространстве monthomery
- */
 typedef struct montgomery_domain {
     bignum_t mod;
     bignum_t r;
