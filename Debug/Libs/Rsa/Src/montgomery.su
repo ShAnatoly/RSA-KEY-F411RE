@@ -2,5 +2,5 @@
 ../Libs/Rsa/Src/montgomery.c:44:6:montg_init	32	static
 ../Libs/Rsa/Src/montgomery.c:61:6:montg_transform	144	static
 ../Libs/Rsa/Src/montgomery.c:74:6:montg_mul	408	static
-../Libs/Rsa/Src/montgomery.c:68:6:montg_revert	160	static
+../Libs/Rsa/Src/montgomery.c:68:6:montg_revert	152	static
 ../Libs/Rsa/Src/montgomery.c:102:6:montg_pow	40	static
